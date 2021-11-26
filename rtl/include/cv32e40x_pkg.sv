@@ -515,7 +515,9 @@ typedef struct packed{
 } dcsr_t;
 
 typedef struct packed {
+  /* verilator lint_off SYMRSVDWORD */
   logic           interrupt;
+  /* verilator lint_off SYMRSVDWORD */
   logic [30:8]    zero0;
   logic [7:0]     exception_code;
 } mcause_t;

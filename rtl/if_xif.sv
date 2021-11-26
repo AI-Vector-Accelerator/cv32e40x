@@ -63,7 +63,9 @@ interface if_xif import cv32e40x_pkg::*;
   typedef struct packed {
     logic accept;     // Is the offloaded instruction (id) accepted by the coprocessor?
     logic writeback;  // Will the coprocessor perform a writeback in the core to rd?
+    /* verilator lint_off SYMRSVDWORD */
     logic float;      // Qualifies whether a writeback is to the floating-point register file or to integer register file?
+    /* verilator lint_off SYMRSVDWORD */
     logic dualwrite;  // Will the coprocessor perform a dual writeback in the core to rd and rd+1?
     logic dualread;   // Will the coprocessor require dual reads from rs1\rs2\rs3 and rs1+1\rs2+1\rs3+1?
     logic loadstore;  // Is the offloaded instruction a load/store instruction?
@@ -102,7 +104,9 @@ interface if_xif import cv32e40x_pkg::*;
     logic [X_RFW_WIDTH-   1:0] data;    // Register file write data value(s)
     logic [               4:0] rd;      // Register file destination address(es)
     logic [X_RFW_WIDTH-XLEN:0] we;      // Register file write enable(s)
+    /* verilator lint_off SYMRSVDWORD */
     logic                      float;   // Floating-point register file or integer register file?
+    /* verilator lint_off SYMRSVDWORD */
     logic                      exc;     // Did the instruction cause a synchronous exception?
     logic [               5:0] exccode; // Exception code
   } x_result_t;
