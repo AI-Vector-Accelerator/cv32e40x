@@ -84,6 +84,7 @@ module cv32e40x_load_store_unit import cv32e40x_pkg::*;
   logic         resp_valid;
   logic [31:0]  resp_rdata;
   logic         bus_resp_err;               // Unused for now
+  logic         resp_exokay;
   data_resp_t   resp;
 
   // Transaction request (from cv32e40x_mpu to cv32e40x_write_buffer)
@@ -151,53 +152,65 @@ module cv32e40x_load_store_unit import cv32e40x_pkg::*;
   ///////////////////////////////// BE generation ////////////////////////////////
   always_comb
   begin
-    case (id_ex_pipe_i.lsu_type) // Data type 00 byte, 01 halfword, 10 word
-      2'b00: begin // Writing a byte
-        case (addr_int[1:0])
-          2'b00: be = 4'b0001;
-          2'b01: be = 4'b0010;
-          2'b10: be = 4'b0100;
-          2'b11: be = 4'b1000;
-        endcase; // case (addr_int[1:0])
+      if (xif_mem_if.mem_ready && xif_mem_if.mem_valid)
+      begin
+        case (xif_mem_if.mem_req.size)
+            2'b00: be = 4'b0001;
+            2'b01: be = 4'b0011;
+            2'b10: be = 4'b1111;
+            // 2'b11 has no significance
+        endcase;
       end
-      2'b01:
-      begin // Writing a half word
-        if (split_q == 1'b0)
-        begin // non-misaligned case
-          case (addr_int[1:0])
-            2'b00: be = 4'b0011;
-            2'b01: be = 4'b0110;
-            2'b10: be = 4'b1100;
-            2'b11: be = 4'b1000;
-          endcase; // case (addr_int[1:0])
-        end
-        else
-        begin // misaligned case
-          be = 4'b0001;
-        end
+      else
+      begin
+        case (id_ex_pipe_i.lsu_type) // Data type 00 byte, 01 halfword, 10 word
+          2'b00: begin // Writing a byte
+            case (addr_int[1:0])
+              2'b00: be = 4'b0001;
+              2'b01: be = 4'b0010;
+              2'b10: be = 4'b0100;
+              2'b11: be = 4'b1000;
+            endcase; // case (addr_int[1:0])
+          end
+          2'b01:
+          begin // Writing a half word
+            if (split_q == 1'b0)
+            begin // non-misaligned case
+              case (addr_int[1:0])
+                2'b00: be = 4'b0011;
+                2'b01: be = 4'b0110;
+                2'b10: be = 4'b1100;
+                2'b11: be = 4'b1000;
+              endcase; // case (addr_int[1:0])
+            end
+            else
+            begin // misaligned case
+              be = 4'b0001;
+            end
+          end
+          default:
+          begin // Writing a word
+            if (split_q == 1'b0)
+            begin // non-misaligned case
+              case (addr_int[1:0])
+                2'b00: be = 4'b1111;
+                2'b01: be = 4'b1110;
+                2'b10: be = 4'b1100;
+                2'b11: be = 4'b1000;
+              endcase; // case (addr_int[1:0])
+            end
+            else
+            begin // misaligned case
+              case (addr_int[1:0])
+                2'b00: be = 4'b0000; // this is not used, but included for completeness
+                2'b01: be = 4'b0001;
+                2'b10: be = 4'b0011;
+                2'b11: be = 4'b0111;
+              endcase; // case (addr_int[1:0])
+            end
+          end
+        endcase; // case (id_ex_pipe_i.lsu_type)
       end
-      default:
-      begin // Writing a word
-        if (split_q == 1'b0)
-        begin // non-misaligned case
-          case (addr_int[1:0])
-            2'b00: be = 4'b1111;
-            2'b01: be = 4'b1110;
-            2'b10: be = 4'b1100;
-            2'b11: be = 4'b1000;
-          endcase; // case (addr_int[1:0])
-        end
-        else
-        begin // misaligned case
-          case (addr_int[1:0])
-            2'b00: be = 4'b0000; // this is not used, but included for completeness
-            2'b01: be = 4'b0001;
-            2'b10: be = 4'b0011;
-            2'b11: be = 4'b0111;
-          endcase; // case (addr_int[1:0])
-        end
-      end
-    endcase; // case (id_ex_pipe_i.lsu_type)
   end
 
   // prepare data to be written to the memory
@@ -212,6 +225,11 @@ module cv32e40x_load_store_unit import cv32e40x_pkg::*;
       2'b10: wdata = {id_ex_pipe_i.operand_c[15:0], id_ex_pipe_i.operand_c[31:16]};
       2'b11: wdata = {id_ex_pipe_i.operand_c[ 7:0], id_ex_pipe_i.operand_c[31: 8]};
     endcase; // case (wdata_offset)
+    //Now check for accepted XIF mem request with 'we' = 1, in which case we overwrite 'wdata' with XIF data
+    if (xif_mem_if.mem_valid && xif_mem_if.mem_ready && xif_mem_if.mem_req.we)
+    begin
+        wdata = xif_mem_if.mem_req.wdata;
+    end
   end
 
 
@@ -431,9 +449,23 @@ module cv32e40x_load_store_unit import cv32e40x_pkg::*;
 
   // generate address from operands
   // todo: operand_b is a 12 bit immediate. May be able to optimize this adder (look at SweRV refefence)
-  assign addr_int = (id_ex_pipe_i.lsu_prepost_useincr) ? (id_ex_pipe_i.alu_operand_a + id_ex_pipe_i.alu_operand_b + (split_q ? 'h4 : 'h0)) :
+  //assign addr_int = (id_ex_pipe_i.lsu_prepost_useincr) ? (id_ex_pipe_i.alu_operand_a + id_ex_pipe_i.alu_operand_b + (split_q ? 'h4 : 'h0)) :
                                                           id_ex_pipe_i.alu_operand_a;
-
+ //Changed above assign statement into always_comb block to allow for condition of accepted XIF mem transaction
+ 
+ always_comb
+ begin
+    if (!(xif_mem_if.mem_valid && xif_mem_if.mem_ready))
+    begin
+        if(id_ex_pipe_i.lsu_prepost_useincr)
+            addr_int = id_ex_pipe_i.alu_operand_a + id_ex_pipe_i.alu_operand_b + (split_q ? 'h4 : 'h0);
+        else
+            addr_int = id_ex_pipe_i.alu_operand_a;
+    end
+    else
+        addr_int = xif_mem_if.mem_req.addr;
+ end
+  
   // Busy if there are ongoing (or potentially outstanding) transfers
   // In the case of mpu errors, the LSU control logic can have outstanding transfers not seen by the response filter.
   assign busy_o = filter_resp_busy || (cnt_q > 0) || trans_valid;
@@ -450,7 +482,7 @@ module cv32e40x_load_store_unit import cv32e40x_pkg::*;
 
   // For last phase of misaligned/split transfer the address needs to be word aligned (as LSB of be will be set)
   assign trans.addr  = split_q ? {addr_int[31:2], 2'b00} : addr_int;
-  assign trans.we    = id_ex_pipe_i.lsu_we;
+  assign trans.we    = (xif_mem_if.mem_valid && xif_mem_if.mem_ready) ? xif_mem_if.mem_req.we : id_ex_pipe_i.lsu_we;
   assign trans.be    = be;
   assign trans.wdata = wdata;
   assign trans.atop  = id_ex_pipe_i.lsu_atop;
@@ -627,7 +659,7 @@ module cv32e40x_load_store_unit import cv32e40x_pkg::*;
   //////////////////////////////////////////////////////////////////////////////
 
   assign trans.prot[0]   = 1'b1;  // Transfers from LSU are data transfers
-  assign trans.prot[2:1] = PRIV_LVL_M; // Machine mode
+  assign trans.prot[2:1] = (xif_mem_if.mem_valid && xif_mem_if.mem_ready) ? xif_mem_if.mem_req.mode : PRIV_LVL_M; // Machine mode
   assign trans.memtype   = 2'b00; // memtype is assigned in the MPU, tie off.
 
   cv32e40x_mpu
@@ -663,7 +695,7 @@ module cv32e40x_load_store_unit import cv32e40x_pkg::*;
 
   // Extract rdata and err from response struct
   assign resp_rdata = resp.bus_resp.rdata;
-
+  assign resp_exokay = resp.bus_resp.exokay;
 
   //////////////////////////////////////////////////////////////////////////////
   // Response Filter
@@ -733,9 +765,11 @@ module cv32e40x_load_store_unit import cv32e40x_pkg::*;
   );
 
   // Drive eXtension interface outputs to 0 for now
-  assign xif_mem_if.mem_ready               = '0;
+  assign xif_mem_if.mem_ready               = ready_0_o; //Ready for new memory access request if LSU says it is ready for new data in EX stage
   assign xif_mem_if.mem_resp                = '0;
   assign xif_mem_result_if.mem_result_valid = '0;
-  assign xif_mem_result_if.mem_result       = '0;
+  assign xif_mem_result_if.mem_result.id = xif_mem_if.mem_req.id;
+  assign xif_mem_result_if.mem_result.rdata = resp_rdata;
+  assign xif_mem_result_if.mem_result.err = bus_resp_err;
 
 endmodule // cv32e40x_load_store_unit
