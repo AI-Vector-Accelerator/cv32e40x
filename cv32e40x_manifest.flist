@@ -70,6 +70,7 @@ ${DESIGN_RTL_DIR}/cv32e40x_core.sv
 ${DESIGN_RTL_DIR}/cv32e40x_mpu.sv
 ${DESIGN_RTL_DIR}/cv32e40x_pma.sv
 ${DESIGN_RTL_DIR}/cv32e40x_pc_target.sv
+${DESIGN_RTL_DIR}/cv32e40n_data_xbar.sv
 
 ${DESIGN_RTL_DIR}/../bhv/cv32e40x_sim_clock_gate.sv
 //${DESIGN_RTL_DIR}/../bhv/cv32e40x_rvfi.sv
