@@ -584,7 +584,7 @@ parameter logic [31:0] TMATCH_CONTROL_RST_VAL = {
 ///////////////////////////////////////////////
 
 // Register file read/write ports
-parameter REGFILE_NUM_WRITE_PORTS = 1;
+parameter REGFILE_NUM_WRITE_PORTS = 2;
 
 // Address width of register file
 parameter REGFILE_ADDR_WIDTH = 5;

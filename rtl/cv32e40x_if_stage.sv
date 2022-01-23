@@ -83,7 +83,6 @@ module cv32e40x_if_stage import cv32e40x_pkg::*;
     // Pipeline handshakes
     output logic        if_valid_o,
     input  logic        id_ready_i,
-
     // eXtension interface
     if_xif.cpu_compressed xif_compressed_if,    // XIF compressed interface
     input  logic          xif_issue_valid_i     // ID stage attempts to offload an instruction

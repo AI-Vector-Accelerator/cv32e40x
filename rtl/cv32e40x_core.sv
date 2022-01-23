@@ -108,7 +108,8 @@ module cv32e40x_core import cv32e40x_pkg::*;
 
   // CPU Control Signals
   input  logic        fetch_enable_i,
-  output logic        core_sleep_o
+  output logic        core_sleep_o,
+  input logic         vector_core_halt
 );
 
   // Number of register file read ports
@@ -809,9 +810,15 @@ module cv32e40x_core import cv32e40x_pkg::*;
   /////////////////////////////////////////////////////////
 
   // Connect register file write port(s) to regfile inputs
+  //Core
   assign regfile_we_wb[0]    = rf_we_wb;
   assign regfile_waddr_wb[0] = rf_waddr_wb;
   assign regfile_wdata_wb[0] = rf_wdata_wb;
+  //XIF
+  assign regfile_we_wb[1]    = xif_result_if.result.we;
+  assign regfile_waddr_wb[1] = xif_result_if.result.rd;
+  assign regfile_wdata_wb[1] = xif_result_if.result.data;
+  //xif_result_if
 
   cv32e40x_register_file_wrapper
   #(

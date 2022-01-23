@@ -109,9 +109,14 @@ module cv32e40x_wb_stage import cv32e40x_pkg::*;
   // In case of MPU/PMA error, the register file should not be written.
   // rf_we_wb_o is deasserted if lsu_mpu_status is not equal to MPU_OK
 
+  //previous	  
   assign rf_we_wb_o     = ex_wb_pipe_i.rf_we && !lsu_exception && !xif_waiting && !xif_exception && instr_valid;
   assign rf_waddr_wb_o  = ex_wb_pipe_i.rf_waddr;
   assign rf_wdata_wb_o  = ex_wb_pipe_i.lsu_en ? lsu_rdata_i : (ex_wb_pipe_i.xif_en ? xif_result_if.result.data : ex_wb_pipe_i.rf_wdata);
+  //new
+  //assign rf_we_wb_o     = ex_wb_pipe_i.rf_we && !lsu_exception && instr_valid;
+  //assign rf_waddr_wb_o  = ex_wb_pipe_i.rf_waddr;
+  //assign rf_wdata_wb_o  = ex_wb_pipe_i.lsu_en ? lsu_rdata_i : (ex_wb_pipe_i.rf_wdata);
 
   //////////////////////////////////////////////////////////////////////////////
   // LSU inputs are valid when LSU is enabled; LSU outputs need to remain valid until downstream stage is ready
@@ -125,7 +130,10 @@ module cv32e40x_wb_stage import cv32e40x_pkg::*;
   //////////////////////////////////////////////////////////////////////////////
   // Stage ready/valid
 
+  //previous
   assign wb_ready_o = lsu_ready_i && !xif_waiting;
+  //new
+  //assign wb_ready_o = lsu_ready_i;
 
   // todo: Above hould have similar structure as ex_ready_o
   // todo: Want the following expression, but currently not SEC clean; might just be caused by fact that OBI assumes are not loaded during SEC
@@ -144,10 +152,11 @@ module cv32e40x_wb_stage import cv32e40x_pkg::*;
                      ( ex_wb_pipe_i.lsu_en && lsu_exception)      // LSU instruction had an exception
                     ) && instr_valid;
 
+
   assign wb_valid_o = wb_valid;
 
   // Export signal indicating WB stage stalled by load/store
-  assign data_stall_o = (ex_wb_pipe_i.lsu_en && !lsu_valid_i) && !wb_valid && instr_valid;
+  assign data_stall_o = ((ex_wb_pipe_i.lsu_en && !lsu_valid_i) && !wb_valid && instr_valid) || xif_result_if.result_valid;
 
 
   //---------------------------------------------------------------------------
