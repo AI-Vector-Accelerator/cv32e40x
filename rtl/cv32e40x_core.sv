@@ -815,7 +815,7 @@ module cv32e40x_core import cv32e40x_pkg::*;
   assign regfile_waddr_wb[0] = rf_waddr_wb;
   assign regfile_wdata_wb[0] = rf_wdata_wb;
   //XIF
-  assign regfile_we_wb[1]    = xif_result_if.result.we;
+  assign regfile_we_wb[1]    = xif_result_if.result_ready && rf_we_wb;
   assign regfile_waddr_wb[1] = xif_result_if.result.rd;
   assign regfile_wdata_wb[1] = xif_result_if.result.data;
   //xif_result_if
